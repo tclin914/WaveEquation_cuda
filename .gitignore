@@ -1,2 +1,2 @@
-cuda/cuda_wave
-serial/serial_wave
+./cuda/cuda_wave
+./serial/serial_wave

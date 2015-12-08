@@ -28,6 +28,7 @@ float  values[MAXPOINTS+2], 	/* values at time t */
 float* valptr;
 float* oldptr;
 float* newptr;
+float cuda_val[MAXPOINTS+2];
 __global__ void cuda_do_math(float* values, float* oldval, float* newval) {
 	
 	float dtime, c, dx, tau, sqtau;
@@ -129,17 +130,18 @@ void update()
             do_math(j); 
       } 
       cuda_do_math<<<1, tpoints>>>(valptr, oldptr, newptr);
-	
-      cudaMemcpy(valptr, values, MAXPOINTS + 2, cudaMemcpyHostToDevice);
-      cudaMemcpy(oldptr, oldval, MAXPOINTS + 2, cudaMemcpyHostToDevice);
-      cudaMemcpy(newptr, newval, MAXPOINTS + 2, cudaMemcpyHostToDevice);
-       
+      float* temp;
+      temp = oldptr;
+      oldptr = valptr;
+      valptr = newptr;
+      newptr = temp; 
       /* Update old values with new values */
       for (j = 1; j <= tpoints; j++) {
          oldval[j] = values[j];
          values[j] = newval[j];
       }
    }
+   cudaMemcpy(cuda_val, valptr, sizeof(float) * tpoints, cudaMemcpyDeviceToHost); 
 }
 
 /**********************************************************************
@@ -156,6 +158,18 @@ void printfinal()
    }
 }
 
+void printfinal_cuda()
+{
+   int i;
+
+   for (i = 1; i <= tpoints; i++) {
+      printf("%6.4f ", cuda_val[i]);
+      if (i%10 == 0)
+         printf("\n");
+   }
+}
+
+
 /**********************************************************************
  *	Main program
  *********************************************************************/
@@ -168,19 +182,21 @@ int main(int argc, char *argv[])
 	init_line();
 
 	/* Allocate global memory on device */
-	cudaMalloc((void**)&valptr, sizeof(float) * (tpoints));
-	cudaMalloc((void**)&oldptr, sizeof(float) * (tpoints));
-	cudaMalloc((void**)&newptr, sizeof(float) * (tpoints));
+	cudaMalloc((void**)&valptr, sizeof(float) * tpoints);
+	cudaMalloc((void**)&oldptr, sizeof(float) * tpoints);
+	cudaMalloc((void**)&newptr, sizeof(float) * tpoints);
 
-	cudaMemcpy(valptr, values, MAXPOINTS + 2, cudaMemcpyHostToDevice);
-	cudaMemcpy(oldptr, oldval, MAXPOINTS + 2, cudaMemcpyHostToDevice);
-	cudaMemcpy(newptr, newval, MAXPOINTS + 2, cudaMemcpyHostToDevice);
+	cudaMemcpy(valptr, values, sizeof(float) * tpoints, cudaMemcpyHostToDevice);	
+	cudaMemcpy(oldptr, oldval, sizeof(float) * tpoints, cudaMemcpyHostToDevice);
+	cudaMemcpy(newptr, newval, sizeof(float) * tpoints, cudaMemcpyHostToDevice);
 
 	printf("Updating all points for all time steps...\n");
 	update();
 	printf("Printing final results...\n");
 	printfinal();
 	printf("\nDone.\n\n");
+
+	printfinal_cuda();
 
 	cudaFree(valptr);
 	cudaFree(oldptr);
