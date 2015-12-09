@@ -25,6 +25,8 @@ float  values[MAXPOINTS+2], 	/* values at time t */
        oldval[MAXPOINTS+2], 	/* values at time (t-dt) */
        newval[MAXPOINTS+2]; 	/* values at time (t+dt) */
 
+
+int maxThreadsPerBlock;
 float* valptr;
 float* oldptr;
 float* newptr;
@@ -38,7 +40,7 @@ __global__ void cuda_do_math(float* values, float* oldval, float* newval) {
 	tau= (c * dtime / dx);
 	sqtau = tau * tau;
 	
-	int i = threadIdx.x;
+	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	newval[i] = (2.0 * values[i]) - oldval[i] + (sqtau *  (-2.0) * values[i]);
 }
 
@@ -128,8 +130,10 @@ void update()
             newval[j] = 0.0; 
          else 
             do_math(j); 
-      } 
-      cuda_do_math<<<1, tpoints>>>(valptr, oldptr, newptr);
+      }
+      int numBlocks = tpoints / maxThreadsPerBlock;
+
+      cuda_do_math<<<numBlocks, maxThreadsPerBlock>>>(valptr, oldptr, newptr);
       float* temp;
       temp = oldptr;
       oldptr = valptr;
@@ -181,6 +185,28 @@ int main(int argc, char *argv[])
 	printf("Initializing points on the line...\n");
 	init_line();
 
+	int count;
+	cudaGetDeviceCount(&count);
+	if (count == 0) {
+		fprintf(stderr, "Here is no cuda device\n");
+		return 1;
+	}
+
+	int i;
+	for (i = 0; i < count; i++) {
+		cudaDeviceProp prop;
+		if (cudaGetDeviceProperties(&prop, i) == cudaSuccess) {
+			/*
+			printf("max grid size = %d\n", prop.maxGridSize);
+			printf("max threads dim = %d\n", prop.maxThreadsDim);
+			printf("max threads per block = %d\n", prop.maxThreadsPerBlock);		
+			*/
+			maxThreadsPerBlock = prop.maxThreadsPerBlock;
+		}
+	}
+
+	cudaSetDevice(i);
+
 	/* Allocate global memory on device */
 	cudaMalloc((void**)&valptr, sizeof(float) * tpoints);
 	cudaMalloc((void**)&oldptr, sizeof(float) * tpoints);
@@ -193,11 +219,12 @@ int main(int argc, char *argv[])
 	printf("Updating all points for all time steps...\n");
 	update();
 	printf("Printing final results...\n");
-	printfinal();
-	printf("\nDone.\n\n");
+	/* printfinal(); */
 
 	printfinal_cuda();
 
+	printf("\nDone.\n\n");
+	
 	cudaFree(valptr);
 	cudaFree(oldptr);
 	cudaFree(newptr);
