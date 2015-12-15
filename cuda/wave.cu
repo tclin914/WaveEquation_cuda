@@ -30,8 +30,9 @@ int maxThreadsPerBlock;
 float* valptr;
 float* oldptr;
 float* newptr;
+int* datasizeptr;
 float cuda_val[MAXPOINTS+2];
-__global__ void cuda_do_math(float* values, float* oldval, float* newval) {
+__global__ void cuda_do_math(float* values, float* oldval, float* newval, int* datasize) {
 	
 	float dtime, c, dx, tau, sqtau;
 	dtime = 0.3;
@@ -41,7 +42,9 @@ __global__ void cuda_do_math(float* values, float* oldval, float* newval) {
 	sqtau = tau * tau;
 	
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
-	newval[i] = (2.0 * values[i]) - oldval[i] + (sqtau *  (-2.0) * values[i]);
+	if (i < (*datasize)) {
+	    newval[i] = (2.0 * values[i]) - oldval[i] + (sqtau *  (-2.0) * values[i]);
+	}
 }
 
 
@@ -120,6 +123,10 @@ void update()
 {
    int i, j;
 
+   int numBlocks = tpoints / maxThreadsPerBlock;
+   if (tpoints % maxThreadsPerBlock != 0) {
+   	numBlocks++;
+   }
    /* Update values for each time step */
    for (i = 1; i<= nsteps; i++) {
       
@@ -131,9 +138,7 @@ void update()
          else 
             do_math(j); 
       }
-      int numBlocks = tpoints / maxThreadsPerBlock;
-
-      cuda_do_math<<<numBlocks, maxThreadsPerBlock>>>(valptr, oldptr, newptr);
+      cuda_do_math<<<numBlocks, maxThreadsPerBlock>>>(valptr, oldptr, newptr, datasizeptr);
       float* temp;
       temp = oldptr;
       oldptr = valptr;
@@ -211,10 +216,12 @@ int main(int argc, char *argv[])
 	cudaMalloc((void**)&valptr, sizeof(float) * tpoints);
 	cudaMalloc((void**)&oldptr, sizeof(float) * tpoints);
 	cudaMalloc((void**)&newptr, sizeof(float) * tpoints);
+	cudaMalloc((void**)&datasizeptr, sizeof(int));
 
 	cudaMemcpy(valptr, values, sizeof(float) * tpoints, cudaMemcpyHostToDevice);	
 	cudaMemcpy(oldptr, oldval, sizeof(float) * tpoints, cudaMemcpyHostToDevice);
 	cudaMemcpy(newptr, newval, sizeof(float) * tpoints, cudaMemcpyHostToDevice);
+	cudaMemcpy(datasizeptr, &tpoints, sizeof(int), cudaMemcpyHostToDevice);
 
 	printf("Updating all points for all time steps...\n");
 	update();
