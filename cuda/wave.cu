@@ -32,6 +32,7 @@ float* oldptr;
 float* newptr;
 int* datasizeptr;
 float cuda_val[MAXPOINTS+2];
+
 __global__ void cuda_do_math(float* values, float* oldval, float* newval, int* datasize) {
 	
 	float dtime, c, dx, tau, sqtau;
@@ -130,14 +131,6 @@ void update()
    /* Update values for each time step */
    for (i = 1; i<= nsteps; i++) {
       
-      /* Update points along line for this time step */
-      for (j = 1; j <= tpoints; j++) { 
-         /* global endpoints */
-         if ((j == 1) || (j  == tpoints)) 
-            newval[j] = 0.0; 
-         else 
-            do_math(j); 
-      }
       cuda_do_math<<<numBlocks, maxThreadsPerBlock>>>(valptr, oldptr, newptr, datasizeptr);
       float* temp;
       temp = oldptr;
@@ -156,17 +149,6 @@ void update()
 /**********************************************************************
  *     Print final results
  *********************************************************************/
-void printfinal()
-{
-   int i;
-
-   for (i = 1; i <= tpoints; i++) {
-      printf("%6.4f ", values[i]);
-      if (i%10 == 0)
-         printf("\n");
-   }
-}
-
 void printfinal_cuda()
 {
    int i;
@@ -226,7 +208,6 @@ int main(int argc, char *argv[])
 	printf("Updating all points for all time steps...\n");
 	update();
 	printf("Printing final results...\n");
-	/* printfinal(); */
 
 	printfinal_cuda();
 
