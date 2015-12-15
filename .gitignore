@@ -1,2 +1,4 @@
-./cuda/cuda_wave
-./serial/serial_wave
+cuda/cuda_wave
+serial/serial_wave
+test/result_serial.txt
+test/result_cuda.txt
