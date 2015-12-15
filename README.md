@@ -13,6 +13,7 @@ In this problem, you need to use CUDA to parallelize concurrent wave equation `s
 * Your program take two command-line arguments, which indicate the number of points and the number of iterations, respectively.
 
 ## Evaluation
+The GPU(s) in the server is an nVidia K20.
 
 Usage:`python test/run_test.py n steps`
 
